@@ -158,6 +158,24 @@ def store_transcript(parsed, source, capture_file, sha256, raw_bytes):
 
 
 async def jev_call(ns, instructions, state, criteria):
+    if os.environ.get("JEV_MOCK") == "1":
+        import hashlib as _h
+        seed = (ns + "|" + instructions + "|" + str(state)[:200]).encode()
+        h = int(_h.sha256(seed).hexdigest()[:8], 16)
+        if ns == "noul":
+            p = (h % 1000) / 1000.0
+            return {"noul": p, "confidence": abs(p - 0.5) * 2, "mock": True}
+        if ns == "choice":
+            keys = list(criteria.keys()) if isinstance(criteria, dict) and criteria else ["a", "b"]
+            idx = h % len(keys)
+            probs = {k: (1.0 if i == idx else 0.0) for i, k in enumerate(keys)}
+            return {"choice": keys[idx], "probabilities": probs, "mock": True}
+        if ns == "score":
+            levels = criteria if isinstance(criteria, list) and criteria else ["low", "medium", "high"]
+            idx = h % len(levels)
+            probs = {str(k): (1.0 if i == idx else 0.0) for i, k in enumerate(levels)}
+            return {"score": levels[idx], "probabilities": probs, "mock": True}
+        return {"mock": True, "ns": ns, "seed": h}
     if not JEV_KEY:
         raise HTTPException(503, "TYPESAFE_API_KEY not set")
     payload = {
@@ -235,6 +253,7 @@ def health():
         "db": ok,
         "db_error": err,
         "jev_configured": bool(JEV_KEY),
+        "jev_mock": os.environ.get("JEV_MOCK") == "1",
         "jev_url": JEV_URL + JEV_PATH,
         "hostname": os.uname().nodename,
         "time": datetime.now().isoformat(),

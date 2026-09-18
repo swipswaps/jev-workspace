@@ -34,7 +34,7 @@ QUICK START
   npm install
   npm run dev
 
-The backend listens on port 8765. The Vite dev server listens on 5173.
+The backend listens on port 8787. The Vite dev server listens on 5173.
 Same-origin localhost, so no Local Network Access prompt.
 
 JEV QUESTION PRIMITIVES

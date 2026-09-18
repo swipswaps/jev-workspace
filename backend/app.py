@@ -1,6 +1,6 @@
 """Jev Workspace backend.
 
-FastAPI on 8765. Deterministic chat-log ingestion, Jev structured
+FastAPI on 8787. Deterministic chat-log ingestion, Jev structured
 judgments (noul / choice / score), SQLite + FTS5 evidence search, and
 audit-run management. Jev is the judgment layer. SQLite is the
 evidence layer. The backend returns typed decisions, not prose.

@@ -3,7 +3,7 @@ set -u
 R="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 V="$R/backend/.venv"
 X="$R/backend/.run"
-P="${BACKEND_PORT:-8765}"
+P="${BACKEND_PORT:-8787}"
 PID="$X/backend.pid"
 mkdir -p "$X"
 if [ ! -d "$V" ]; then

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import httpx
 
-BACKEND = "http://localhost:8765"
+BACKEND = "http://localhost:8787"
 
 
 def main():

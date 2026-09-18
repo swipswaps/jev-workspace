@@ -8,7 +8,7 @@ export function getBackendUrl() {
   if (import.meta.env.VITE_API_BASE) {
     return String(import.meta.env.VITE_API_BASE).replace(/\/+$/, '')
   }
-  return 'http://localhost:8765'
+  return 'http://localhost:8787'
 }
 
 export function setBackendUrl(u) {

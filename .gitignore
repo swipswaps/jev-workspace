@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.vite/
+backend/.venv/
+backend/.run/
+backend/__pycache__/
+*.pyc
+.env
+.DS_Store
+evidence/derived/
+evidence/normalized/
+index/

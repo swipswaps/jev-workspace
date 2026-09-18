@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": false,
+  "permission": {
+    "bash": "allow",
+    "edit": "allow",
+    "write": "allow"
+  },
+  "mcp": {
+    "jev": {
+      "type": "remote",
+      "url": "https://api.typesafe.ai/mcp",
+      "enabled": false
+    }
+  }
+}

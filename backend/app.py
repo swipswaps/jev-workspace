@@ -88,42 +88,87 @@ def init_db():
                 INSERT INTO turns_fts(rowid, text, code_blocks, paths, commands, errors)
                 VALUES (new.id, new.text, new.code_blocks, new.paths, new.commands, new.errors);
             END;
+            CREATE TRIGGER IF NOT EXISTS turns_ad AFTER DELETE ON turns BEGIN
+                INSERT INTO turns_fts(turns_fts, rowid, text, code_blocks, paths, commands, errors)
+                VALUES ('delete', old.id, old.text, old.code_blocks, old.paths, old.commands, old.errors);
+            END;
         """)
+        # backfill: index any turn rows that predate the trigger
+        con.execute("""
+            INSERT INTO turns_fts(rowid, text, code_blocks, paths, commands, errors)
+            SELECT id, text, code_blocks, paths, commands, errors FROM turns
+            WHERE id NOT IN (SELECT rowid FROM turns_fts)
+        """)
+        con.commit()
     con.commit()
     con.close()
 
 
-TURN_RE = re.compile(
-    r"^(#{1,6})\s+(User|Assistant|Human|AI|System)\s*$",
-    re.MULTILINE | re.IGNORECASE,
-)
-SPEAKER_LINE_RE = re.compile(
-    r"^(User|Assistant|Human|AI|System)\s*:\s*$",
-    re.MULTILINE | re.IGNORECASE,
-)
+# Multi-format turn detection. Each entry is (pattern, group_index).
+# order matters: first match wins.
+TURN_PATTERNS = [
+    # ### user / ### assistant                              [18]
+    (re.compile(r"^(#{1,6})\s+(user|assistant|human|ai|system|chatgpt)\s*$",
+                re.MULTILINE | re.IGNORECASE), 2),
+    # **user** / **assistant**
+    (re.compile(r"^\*\*(user|assistant|human|ai|system|chatgpt)\*\*\s*$",
+                re.MULTILINE | re.IGNORECASE), 1),
+    # You said: / ChatGPT said:                             [10]
+    (re.compile(r"^(you\s+said|chatgpt\s+said|assistant\s+said|user\s+said)\s*:?\s*$",
+                re.MULTILINE | re.IGNORECASE), 1),
+    # user: / assistant: (bare colon)                       [14]
+    (re.compile(r"^(user|assistant|human|ai|system|chatgpt)\s*:\s*$",
+                re.MULTILINE | re.IGNORECASE), 1),
+]
+
 CODE_RE = re.compile(r"```(\w*)\n(.*?)```", re.DOTALL)
 PATH_RE = re.compile(r"(?:~|/)[\w./-]+\.\w+")
 CMD_RE = re.compile(r"^\s*\$\s+(.+)$", re.MULTILINE)
 ERR_RE = re.compile(r"(?:Error|error|ERROR|Traceback|FAILED|failed)[:\s].{0,200}")
 
 
+def normalize_role(role):
+    r = role.lower().strip().rstrip(":")
+    if r in ("user", "human", "you said", "user said"):
+        return "user"
+    if r in ("assistant", "ai", "system", "chatgpt", "chatgpt said", "assistant said"):
+        return "assistant"
+    return "unknown"
+
+
 def _turn_matches(raw):
-    a = list(TURN_RE.finditer(raw))
-    if a:
-        return a, 2
-    b = list(SPEAKER_LINE_RE.finditer(raw))
-    return b, 1
+    """Return (matches, group_index) for the first pattern that matches."""
+    for pat, grp in TURN_PATTERNS:
+        m = list(pat.finditer(raw))
+        if m:
+            return m, grp
+    return [], 1
 
 
 def parse_transcript(raw, conversation_id):
     matches, speaker_group = _turn_matches(raw)
     turns = []
+    # pre-heading text is stored as turn 0 with unknown speaker
+    if matches and matches[0].start() > 0:
+        pre = raw[:matches[0].start()].strip()
+        if pre:
+            turns.append({
+                "conversation_id": conversation_id,
+                "turn_number": 0,
+                "speaker": "unknown",
+                "text": pre,
+                "code_blocks": json.dumps([c.group(2) for c in CODE_RE.finditer(pre)]),
+                "paths": json.dumps(sorted(set(PATH_RE.findall(pre)))),
+                "commands": json.dumps(CMD_RE.findall(pre)),
+                "errors": json.dumps(ERR_RE.findall(pre)),
+                "created_at": datetime.now().isoformat(),
+            })
     for i, m in enumerate(matches):
         start = m.end()
         end = matches[i + 1].start() if i + 1 < len(matches) else len(raw)
         body = raw[start:end].strip()
-        speaker_raw = m.group(speaker_group).strip().lower()
-        speaker = "user" if speaker_raw in ("user", "human") else "assistant"
+        speaker_raw = m.group(speaker_group)
+        speaker = normalize_role(speaker_raw)
         code_blocks = [c.group(2) for c in CODE_RE.finditer(body)]
         paths = sorted(set(PATH_RE.findall(body)))
         commands = CMD_RE.findall(body)
@@ -291,11 +336,35 @@ def conversations():
 @app.get("/turns/{conversation_id}")
 def turns(conversation_id: str, limit: int = 200):
     con = db()
+    # exact match first; if none, try prefix match (handles _0001 suffix)
     rows = [dict(r) for r in con.execute(
         "SELECT * FROM turns WHERE conversation_id=? ORDER BY turn_number LIMIT ?",
         (conversation_id, limit)).fetchall()]
+    if not rows:
+        rows = [dict(r) for r in con.execute(
+            "SELECT * FROM turns WHERE conversation_id LIKE ? ORDER BY turn_number LIMIT ?",
+            (conversation_id + "%", limit)).fetchall()]
     con.close()
     return {"turns": rows, "count": len(rows)}
+
+
+@app.get("/debug/raw/{conversation_id}")
+def debug_raw(conversation_id: str, lines: int = 40):
+    """Show the first N lines of the raw transcript for parser diagnosis."""
+    raw_dir = EVIDENCE_ROOT / "raw"
+    if not raw_dir.is_dir():
+        raise HTTPException(404, "no raw evidence directory")
+    candidates = list(raw_dir.glob(conversation_id + "*"))
+    if not candidates:
+        raise HTTPException(404, "no matching raw file")
+    text = candidates[0].read_text(errors="replace")
+    head = text.splitlines()[:lines]
+    # count which turn patterns match, to identify the format
+    counts = {}
+    for i, (pat, _) in enumerate(TURN_PATTERNS):
+        counts["pattern_" + str(i)] = len(pat.findall(text))
+    return {"file": str(candidates[0]), "lines": head,
+            "match_counts": counts, "total_bytes": len(text)}
 
 
 @app.get("/search")

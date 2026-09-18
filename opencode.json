@@ -12,5 +12,6 @@
       "url": "https://api.typesafe.ai/mcp",
       "enabled": false
     }
-  }
+  },
+  "model": "anthropic/claude-sonnet-4-5"
 }

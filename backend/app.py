@@ -18,6 +18,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
+from starlette.datastructures import MutableHeaders
 
 EVIDENCE_ROOT = Path(os.environ.get("EVIDENCE_ROOT", str(Path.home() / "jev-evidence")))
 DB_PATH = EVIDENCE_ROOT / "index" / "jev.db"
@@ -179,14 +180,42 @@ async def jev_call(ns, instructions, state, criteria):
 
 
 app = FastAPI(title="Jev Workspace", version="2.0.0")
+
+
+class PrivateNetworkAccessMiddleware:
+    """Adds Access-Control-Allow-Private-Network: true to every response.
+
+    Starlette added allow_private_network natively in 0.51.0 (Jan 2026).
+    FastAPI 0.115.0 pins starlette<0.42.0, so this shim is required.
+    It does NOT short-circuit the CORS preflight: CORS runs first and
+    produces its response, then this middleware adds the PNA header.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                headers["Access-Control-Allow-Private-Network"] = "true"
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_private_network=True,
 )
+app.add_middleware(PrivateNetworkAccessMiddleware)
 
 init_db()
 

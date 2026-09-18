@@ -1,4 +1,8 @@
+# Pins verified:
+#   fastapi 0.115.0   -> starlette>=0.37.2,<0.39.0
+#   starlette 0.38.6  -> no allow_private_network (added in 0.51.0)
+#   python-multipart  -> required for File/Form uploads
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
-httpx>=0.27.0
+httpx>=0.27.0,<0.29.0
 python-multipart>=0.0.9

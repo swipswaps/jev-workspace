@@ -1,0 +1,8 @@
+# Pins verified against:
+#   https://pypi.org/project/fastapi/0.115.0/   starlette>=0.37.2,<0.39.0
+#   https://pypi.org/project/starlette/0.38.6/   no allow_private_network
+#   https://fastapi.tiangolo.com/tutorial/request-files/  python-multipart required
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+httpx>=0.27.0,<0.29.0
+python-multipart>=0.0.9

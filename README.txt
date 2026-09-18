@@ -7,19 +7,7 @@ layer, and opencode is the coding agent.
 
 ARCHITECTURE
 
-  CHAT LOG
-     |
-     v
-  deterministic parser  (no AI)
-     |
-     v
-  SQLite + FTS5
-     |
-     v
-  Jev judgments  (noul / choice / score)
-     |
-     v
-  opencode agent
+  CHAT LOG -> deterministic parser -> SQLite + FTS5 -> Jev judgments -> opencode
 
   evidence/raw/         immutable transcripts
   evidence/normalized/  parsed turns, JSONL
@@ -27,15 +15,15 @@ ARCHITECTURE
 
 QUICK START
 
-  export TYPESAFE_API_KEY="ts_..."
+  export TYPESAFE_API_KEY="ts_..."     (optional; JEV_MOCK=1 works without)
   bash scripts/start.sh
   python3 scripts/ingest.py <chatlog.txt> <conversation_id>
   bash scripts/audit.sh
   npm install
   npm run dev
 
-The backend listens on port 8787. The Vite dev server listens on 5173.
-Same-origin localhost, so no Local Network Access prompt.
+Backend listens on port 8787. Vite dev server on 5173. Same-origin, so
+no Local Network Access prompt.
 
 JEV QUESTION PRIMITIVES
 
@@ -43,26 +31,15 @@ JEV QUESTION PRIMITIVES
   choice   key + probabilities       routing, classification
   score    level + probabilities     severity, ranking
 
-OPENCODE
-
-opencode reads opencode.json from the repo root and AGENTS.md for
-project rules. Both are plain text. Agents are configured by editing
-opencode.json.
-
 ENVIRONMENT VARIABLES
 
-  TYPESAFE_API_KEY    required for Jev calls
+  TYPESAFE_API_KEY    required for real Jev calls
   TYPESAFE_BASE_URL   default https://api.typesafe.ai
   TYPESAFE_PATH       default /ask
   JEV_MODEL           default jev-latest
+  JEV_MOCK            1 = use deterministic mock responses (no key needed)
   EVIDENCE_ROOT       default $HOME/jev-evidence
-  BACKEND_PORT        default 8765
-
-WHAT JEV IS NOT
-
-Jev is not a chatbot. It answers typed questions. Do not ask it to
-generate prose. Use it for routing, classification, verification,
-ranking, and gating. Application code owns the control flow.
+  BACKEND_PORT        default 8787
 
 ENDPOINTS
 
@@ -75,9 +52,11 @@ ENDPOINTS
   GET  /jev/calls
   GET  /audit/runs
   GET  /audit/latest
+  GET  /debug/formats/{cid}      diagnose parser format detection
+  GET  /debug/raw/{cid}          first N lines of the raw file
 
 REQUIREMENTS
 
-  python3, node 20, npm, jq, curl, ss (iproute2)
+  python3, node 20, npm, jq, curl, ss, sqlite3, sha256sum
   gh (optional, authenticated) for GitHub push
   opencode (optional) for the coding agent

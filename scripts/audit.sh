@@ -17,11 +17,7 @@ REPORT="$OUT/REPORT.txt"
   echo ""
   echo "[backend health]"
   curl -sS -o "$OUT/health.json" -w "http_code=%{http_code}\n" "http://localhost:8787/health" 2>&1
-  if [ -f "$OUT/health.json" ]; then
-    echo "body:"
-    head -c 400 "$OUT/health.json"
-    echo ""
-  fi
+  [ -f "$OUT/health.json" ] && { echo "body:"; head -c 400 "$OUT/health.json"; echo ""; }
   echo ""
   echo "[conversations]"
   curl -sS -o "$OUT/convs.json" -w "http_code=%{http_code}\n" "http://localhost:8787/conversations" 2>&1

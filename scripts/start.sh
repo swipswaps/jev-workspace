@@ -6,15 +6,10 @@ X="$R/backend/.run"
 P="${BACKEND_PORT:-8787}"
 PID="$X/backend.pid"
 mkdir -p "$X"
-if [ ! -d "$V" ]; then
-  python3 -m venv "$V"
-fi
-"$V/bin/pip" install --quiet --upgrade pip
-"$V/bin/pip" install --quiet -r "$R/backend/requirements.txt"
 if [ -f "$PID" ]; then
   p="$(cat "$PID")"
   if [ -d "/proc/$p" ]; then
-    echo "already running pid $p"
+    echo "  already running pid $p"
     exit 0
   fi
   rm -f "$PID"
@@ -24,16 +19,11 @@ EVIDENCE_ROOT="${EVIDENCE_ROOT:-$HOME/jev-evidence}" \
   > "$X/backend.log" 2>&1 &
 echo $! > "$PID"
 echo "  pid $(cat "$PID"); waiting for /health (max 20s)..."
-
-# Wait for the middleware stack to be built and /health to answer.
-# Starlette builds middleware_stack lazily on the first request:
-#   https://github.com/encode/starlette/blob/master/starlette/applications.py
-# Without this wait, callers race the first-request initialization.
 UP=0
 for i in $(seq 1 20); do
   sleep 1
   if [ ! -d "/proc/$(cat "$PID")" ]; then
-    echo "  process exited before becoming ready; log tail:"
+    echo "  process exited before ready; log tail:"
     tail -n 30 "$X/backend.log"
     exit 0
   fi

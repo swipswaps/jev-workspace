@@ -12,7 +12,5 @@ export function getBackendUrl() {
 }
 
 export function setBackendUrl(u) {
-  try {
-    localStorage.setItem(K, String(u).replace(/\/+$/, ''))
-  } catch (e) {}
+  try { localStorage.setItem(K, String(u).replace(/\/+$/, '')) } catch (e) {}
 }

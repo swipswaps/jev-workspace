@@ -3,11 +3,12 @@ import { api } from './services/api.js'
 import { getBackendUrl, setBackendUrl } from './config.js'
 
 function Card(props) {
+  const a = props.a || ''
   return (
-    <div className={'card ' + (props.a || '')}>
+    <div className={'card ' + a}>
       <div className="card-title">{props.t}</div>
       <div className="card-value">{props.v}</div>
-      {props.s && <div className="card-sub">{props.s}</div>}
+      {props.s ? <div className="card-sub">{props.s}</div> : null}
     </div>
   )
 }
@@ -15,21 +16,17 @@ function Card(props) {
 function Overview(props) {
   const h = props.health
   const convs = props.convs
-  if (!h) {
-    return <div className="empty">Waiting for backend...</div>
-  }
+  if (!h) return <div className="empty">Waiting for backend...</div>
   return (
     <section>
       <div className="cards">
         <Card t="Backend" v="online" s={'db: ' + h.db} />
-        <Card t="Jev" v={h.jev_configured ? 'configured' : 'not configured'} s="TYPESAFE_API_KEY" />
+        <Card t="Jev" v={h.jev_configured ? 'configured' : (h.jev_mock ? 'mock' : 'not configured')} s="TYPESAFE_API_KEY" />
         <Card t="Conversations" v={convs.length} s="ingested" />
       </div>
       <h3>Recent conversations</h3>
       <table className="tbl">
-        <thead>
-          <tr><th>ID</th><th>Source</th><th>Bytes</th><th>Captured</th></tr>
-        </thead>
+        <thead><tr><th>ID</th><th>Source</th><th>Bytes</th><th>Captured</th></tr></thead>
         <tbody>
           {convs.map(function (c) {
             return (
@@ -52,8 +49,7 @@ function Search() {
   const [rows, setRows] = useState([])
   const [err, setErr] = useState('')
   function go() {
-    api.search(q)
-      .then(function (r) { setRows(r.results || []); setErr('') })
+    api.search(q).then(function (r) { setRows(r.results || []); setErr('') })
       .catch(function (e) { setErr(String(e.message || e)) })
   }
   return (
@@ -65,9 +61,7 @@ function Search() {
       </div>
       {err ? <div className="empty bad">{err}</div> : null}
       <table className="tbl">
-        <thead>
-          <tr><th>Conv</th><th>Turn</th><th>Speaker</th><th>Text</th></tr>
-        </thead>
+        <thead><tr><th>Conv</th><th>Turn</th><th>Speaker</th><th>Text</th></tr></thead>
         <tbody>
           {rows.map(function (r) {
             const txt = String(r.text || '').slice(0, 200)
@@ -95,9 +89,7 @@ function JevCalls() {
     <section>
       <h3>Jev calls</h3>
       <table className="tbl">
-        <thead>
-          <tr><th>ID</th><th>Conv</th><th>NS</th><th>Latency</th><th>When</th></tr>
-        </thead>
+        <thead><tr><th>ID</th><th>Conv</th><th>NS</th><th>Latency</th><th>When</th></tr></thead>
         <tbody>
           {calls.map(function (c) {
             return (
@@ -120,8 +112,7 @@ function Audit() {
   const [report, setReport] = useState('')
   const [err, setErr] = useState('')
   useEffect(function () {
-    api.auditLatest()
-      .then(function (r) { setReport(r) })
+    api.auditLatest().then(function (r) { setReport(r) })
       .catch(function (e) { setErr(String(e.message || e)) })
   }, [])
   return (
@@ -143,37 +134,26 @@ export default function App() {
   useEffect(function () {
     let cancel = false
     function tick() {
-      api.health()
-        .then(function (h) {
-          if (cancel) return
-          setHealth(h)
-          return api.conversations()
-        })
-        .then(function (c) {
-          if (cancel || !c) return
-          setConvs(c.conversations || [])
-        })
-        .catch(function () {
-          if (!cancel) setHealth(null)
-        })
+      api.health().then(function (h) {
+        if (cancel) return
+        setHealth(h)
+        return api.conversations()
+      }).then(function (c) {
+        if (cancel || !c) return
+        setConvs(c.conversations || [])
+      }).catch(function () {
+        if (!cancel) setHealth(null)
+      })
     }
     tick()
     const i = setInterval(tick, 5000)
     return function () { cancel = true; clearInterval(i) }
   }, [url])
 
-  function apply() {
-    setBackendUrl(draft)
-    setUrl(getBackendUrl())
-  }
+  function apply() { setBackendUrl(draft); setUrl(getBackendUrl()) }
 
-  const tabs = [
-    ['overview', 'Overview'],
-    ['search', 'Search'],
-    ['jev', 'Jev Calls'],
-    ['audit', 'Audit'],
-  ]
-
+  const tabs = [['overview', 'Overview'], ['search', 'Search'],
+                ['jev', 'Jev Calls'], ['audit', 'Audit']]
   const pillClass = 'pill ' + (health ? 'ok' : 'bad')
   const pillText = health ? 'online' : 'offline'
 
@@ -192,11 +172,7 @@ export default function App() {
           const id = pair[0]
           const label = pair[1]
           const cls = 'tab' + (tab === id ? ' active' : '')
-          return (
-            <button key={id} className={cls} onClick={function () { setTab(id) }}>
-              {label}
-            </button>
-          )
+          return <button key={id} className={cls} onClick={function () { setTab(id) }}>{label}</button>
         })}
       </nav>
       <main>

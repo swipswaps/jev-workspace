@@ -23,7 +23,7 @@ CORE RULES
    Python. No model touches raw transcripts.
 
 5. Audit before edit. Run bash scripts/audit.sh before modifying any
-   tracked file. The audit writes evidence/derived/<timestamp>/REPORT.txt.
+   tracked file.
 
 6. No exit 1 in user-facing scripts. Use return 0 or fall through.
 
@@ -41,7 +41,7 @@ JEV QUESTION PRIMITIVES
 
 COMMANDS
 
-  bash scripts/start.sh                                  start backend on :8765
+  bash scripts/start.sh                                  start backend on :8787
   bash scripts/stop.sh                                   stop backend
   python3 scripts/ingest.py <file.txt> <conversation_id> ingest a chat log
   bash scripts/audit.sh                                  run audit

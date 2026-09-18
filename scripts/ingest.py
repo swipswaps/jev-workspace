@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic chat-log ingestion via the backend API. No AI."""
+"""Deterministic chat-log ingestion via the backend API."""
 import hashlib
 import json
 import sys
@@ -20,16 +20,13 @@ def main():
         print("not found: " + str(path))
         return 0
     raw = path.read_bytes()
-    sha = hashlib.sha256(raw).hexdigest()
     print("file: " + str(path))
-    print("sha256: " + sha)
+    print("sha256: " + hashlib.sha256(raw).hexdigest())
     print("bytes: " + str(len(raw)))
     with httpx.Client(timeout=30.0) as c:
-        r = c.post(
-            BACKEND + "/ingest",
-            files={"file": (path.name, raw, "text/plain")},
-            data={"source": "cli"},
-        )
+        r = c.post(BACKEND + "/ingest",
+                   files={"file": (path.name, raw, "text/plain")},
+                   data={"source": "cli"})
         if r.status_code != 200:
             print("ingest failed: " + str(r.status_code))
             print(r.text[:300])

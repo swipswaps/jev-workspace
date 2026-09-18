@@ -145,9 +145,40 @@ def _turn_matches(raw):
     return [], 1
 
 
+FRAGMENT_SPLIT_RE = re.compile(r"\n\s*\n+")
+
+
 def parse_transcript(raw, conversation_id):
     matches, speaker_group = _turn_matches(raw)
     turns = []
+
+    # Markerless fallback: file has no role headings at all. This is the
+    # default output of ChatGPT's select-all + Ctrl+C on the web UI.
+    # https://community.openai.com/t/how-to-copy-chatgpt-conversation-with-markdown-formatting/336646
+    # We store each blank-line-separated block as a "fragment" so that
+    # search and audit still work. Speaker remains "fragment" because we
+    # cannot determine role without markers. Do not fabricate.
+    if not matches:
+        blocks = FRAGMENT_SPLIT_RE.split(raw)
+        for i, blk in enumerate(blocks):
+            blk = blk.strip()
+            if not blk:
+                continue
+            turns.append({
+                "conversation_id": conversation_id,
+                "turn_number": i,
+                "speaker": "fragment",
+                "text": blk,
+                "code_blocks": json.dumps([c.group(2) for c in CODE_RE.finditer(blk)]),
+                "paths": json.dumps(sorted(set(PATH_RE.findall(blk)))),
+                "commands": json.dumps(CMD_RE.findall(blk)),
+                "errors": json.dumps(ERR_RE.findall(blk)),
+                "created_at": datetime.now().isoformat(),
+            })
+        return {"conversation_id": conversation_id,
+                "turn_count": len(turns),
+                "turns": turns,
+                "mode": "fragment"}
     # pre-heading text is stored as turn 0 with unknown speaker
     if matches and matches[0].start() > 0:
         pre = raw[:matches[0].start()].strip()
@@ -419,6 +450,27 @@ def jev_calls(limit: int = 50):
         "SELECT * FROM jev_calls ORDER BY id DESC LIMIT ?", (limit,)).fetchall()]
     con.close()
     return {"calls": rows, "count": len(rows)}
+
+
+@app.get("/debug/formats/{conversation_id}")
+def debug_formats(conversation_id: str):
+    """Report which turn patterns match the raw file, plus a sample of
+    the first non-empty line. Used to identify the export format."""
+    raw_dir = EVIDENCE_ROOT / "raw"
+    if not raw_dir.is_dir():
+        raise HTTPException(404, "no raw dir")
+    candidates = list(raw_dir.glob(conversation_id + "*"))
+    if not candidates:
+        raise HTTPException(404, "no matching raw file")
+    text = candidates[0].read_text(errors="replace")
+    counts = {}
+    for i, (pat, _) in enumerate(TURN_PATTERNS):
+        counts["pattern_" + str(i)] = len(pat.findall(text))
+    frag_count = len(FRAGMENT_SPLIT_RE.split(text))
+    nonempty = [ln for ln in text.splitlines() if ln.strip()][:5]
+    return {"file": str(candidates[0]), "match_counts": counts,
+            "fragment_count": frag_count, "first_lines": nonempty,
+            "total_bytes": len(text)}
 
 
 @app.get("/audit/runs")

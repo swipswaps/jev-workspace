@@ -23,4 +23,28 @@ EVIDENCE_ROOT="${EVIDENCE_ROOT:-$HOME/jev-evidence}" \
   nohup "$V/bin/uvicorn" app:app --host 0.0.0.0 --port "$P" --app-dir "$R/backend" \
   > "$X/backend.log" 2>&1 &
 echo $! > "$PID"
-echo "started on :$P pid $(cat "$PID")"
+echo "  pid $(cat "$PID"); waiting for /health (max 20s)..."
+
+# Wait for the middleware stack to be built and /health to answer.
+# Starlette builds middleware_stack lazily on the first request:
+#   https://github.com/encode/starlette/blob/master/starlette/applications.py
+# Without this wait, callers race the first-request initialization.
+UP=0
+for i in $(seq 1 20); do
+  sleep 1
+  if [ ! -d "/proc/$(cat "$PID")" ]; then
+    echo "  process exited before becoming ready; log tail:"
+    tail -n 30 "$X/backend.log"
+    exit 0
+  fi
+  BODY="$(curl -sS --max-time 2 "http://localhost:$P/health" 2>&1)"
+  if printf '%s' "$BODY" | grep -q 'jev_url'; then
+    UP=1
+    echo "  ready after ${i}s"
+    break
+  fi
+done
+if [ "$UP" -eq 0 ]; then
+  echo "  not ready after 20s; log tail:"
+  tail -n 30 "$X/backend.log"
+fi
